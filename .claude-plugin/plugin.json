@@ -1,7 +1,12 @@
 {
   "name": "wechat-mp-writer",
-  "description": "微信公众号内容创作与发布全流程 Skill",
+  "version": "1.0.0",
+  "description": "微信公众号内容创作与发布全流程 Skill — 从信息搜集、内容创作、排版到API发布的端到端工作流",
   "author": {
-    "name": "daizhouchen"
-  }
+    "name": "daizhouchen",
+    "url": "https://github.com/daizhouchen"
+  },
+  "homepage": "https://github.com/daizhouchen/wechat-mp-writer",
+  "repository": "https://github.com/daizhouchen/wechat-mp-writer",
+  "license": "MIT"
 }
