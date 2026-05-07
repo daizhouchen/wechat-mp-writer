@@ -1,3 +1,13 @@
+<!-- daizhouchen-banner-begin -->
+<p align="center">
+  <img src="assets/hero.png" alt="wechat-mp-writer" width="100%"/>
+</p>
+
+> **微信公众号内容创作与发布 · Skill 化的内容流水线。**
+>
+> *WeChat Official Account content pipeline as a skill.*
+<!-- daizhouchen-banner-end -->
+
 # wechat-mp-writer
 
 微信公众号内容创作与发布 Claude Code Skill。从信息搜集、内容撰写、排版到 API 发布的端到端全自动工作流。
@@ -123,3 +133,9 @@ wechat-mp-writer/
 ## License
 
 MIT
+
+---
+<!-- daizhouchen-footer-begin -->
+
+Part of [**daizhouchen 实验集**](https://github.com/daizhouchen) → 一个 AI 应用创造者的实验现场。
+<!-- daizhouchen-footer-end -->
