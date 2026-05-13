@@ -12,18 +12,27 @@
 
 微信公众号内容创作与发布 Claude Code Skill。从信息搜集、内容撰写、排版到 API 发布的端到端全自动工作流。
 
-## 功能
+**v2（2026-05）升级**：参考 book-distiller / movie-distiller / domain-onboarding 三个蒸馏级 skill 的方法论 DNA，把"工作流清单"升级为"distiller 级蒸馏产物"。核心改动在**内容深度**和**图片获取与视觉审查**两块——每篇文章带"信任度报告"，每张图都过 Claude Vision 三项审查。
 
-- **用户画像持久化**：首次配置公众号定位、读者画像、写作风格、关注赛道，保存为 `.wechat-profile.md`，后续每次创作自动加载
+## v2 新功能（核心改动）
+
+- **三层证据链**：事实层 → 机制层 → 观点层。每条观点必 cite ≥3 条事实，每段必含具体名词（人名/公司/数字/年份），禁止"裸观点"和"框架名出现在正文"。详见 `references/content-engine.md`。
+- **来源 A/B/C/D 分级**：每条信息打分级，文末自动渲染"信任度报告"——A 级一手原始 N 处 · B 级权威二手 N 处 · C 级普通二手 N 处 · 作者推断 N 处 · 置信度 ★★★★。详见 `references/source-grading.md`。
+- **6 段图片 Pipeline + Vision 审查**：实体级搜词 → 多源抓取（Wikimedia / Unsplash / 官方 / 本地 / Web）→ 去重 → **Claude Vision 三项审查（对题度 / 清晰度 / 手机适配，各 0-5 分）** → 段落语义匹配 → 失败回退（SVG / 引述块 / 跳过）。详见 `references/image-pipeline.md`。
+- **7 种排版骨架 + 防审美疲劳**：数据先行 / 故事开篇 / 问答列表 / 时间线 / 对比表 / 拆解清单 / 访谈摘录。每篇按决策树选骨架 + 强调色 + 装饰，强制和近 3 篇不同。字数对标新智元（短 1500-2500 / 中 2500-4000 / 长 ≤6000，绝不出 distiller 那种 8000+ 字长文）。详见 `references/layout-variants.md`。
+- **article.json 结构化中间产物**：可改、可量化、可复用。改某段事实只动 JSON 一个字段。详见 `references/article-schema.md`。
+- **21 项量化质量闸门**：`scripts/quality_check.py` 扫 A 级事实数 / AI 套话 / 框架名泄漏 / 字数 budget / vision pass 率 / layout 防重复等。任一 fail 不允许发布。
+
+## v1 功能（保留 + 兼容）
+
+- **用户画像持久化**：首次配置公众号定位、读者画像、写作风格，保存为 `.wechat-profile.md`，后续自动加载
 - **主动信息搜集**：接到主题后自动用 WebSearch/WebFetch 搜集行业数据、专家观点、竞品分析，先出素材卡再动笔
-- **去 AI 味创作**：禁止 emoji 装饰、禁止 AI 套话、像人类专家一样写作，输出有观点有温度的内容
-- **多风格标题生成**：数字式/悬念式/痛点式/对比式/权威式/故事式等 8 种风格，生成 5+ 候选标题
+- **去 AI 味五铁律**：禁止 emoji 装饰、禁止 AI 套话、像人类专家一样写作（v2 在五铁律之上加红线 6-10）
+- **多风格标题生成**：8 种风格，生成 5+ 候选（v2 升级为 Title × Hook × CTA 三件套 + 9 分制评分）
 - **8 种内容模板**：干货教程、观点评论、行业分析、产品介绍、活动推广、人物故事、盘点清单、对比测评
 - **微信兼容 HTML 排版**：4 套预设配色、完整的文字层级体系、移动端适配
-- **智能图片获取**：按内容实体搜索关联图片（而非泛泛的主题图片），自动下载、上传到微信服务器并替换
-- **API 发布工作流**：创作 -> 上传素材 -> 存草稿 -> 预览 -> 确认 -> 发布
-- **一条龙模式**：说"一条龙"或"全自动"，从搜集资料到发布全程无需确认，自动完成
-- **合规检查**：广告法极限词检测、敏感词提醒、发布前二次确认
+- **API 发布工作流**：创作 → 上传素材 → 存草稿 → 预览 → 确认 → 发布
+- **一条龙模式**：说"一条龙"或"全自动"，从搜集资料到发布全程无需确认（v2 默认开启 vision 审查 + 信任度报告）
 - **SEO 优化**：搜一搜关键词策略、社交传播优化、发布时间推荐、转发引导话术
 
 ## 安装
@@ -107,7 +116,26 @@ Skill 会按步骤执行：搜集信息 -> 展示素材卡 -> 等你选角度 ->
 一条龙帮我写一篇 AI 行业洞察的公众号文章并发布
 ```
 
-从搜集资料到发布全程自动，无需任何确认。完成后输出简报。
+从搜集资料到发布全程自动，无需任何确认。完成后输出简报。v2 一条龙默认开启 vision 审查 + 信任度报告 + quality_check。
+
+### v2 单独使用某个工具
+
+```bash
+# 实体级搜图（搜 Sam Altman 的图，从 Wikimedia）
+python3 skills/wechat-mp-writer/scripts/image_search.py search \
+    --keywords "Sam Altman portrait" --source wikimedia --limit 5 \
+    --download ./articles/my-article/images/
+
+# Vision 审查整篇 article.json 里所有候选图
+export ANTHROPIC_API_KEY=sk-ant-...
+python3 skills/wechat-mp-writer/scripts/image_vision_review.py batch \
+    --plan ./articles/my-article/article.json
+
+# 跑 21 项质量闸门
+python3 skills/wechat-mp-writer/scripts/quality_check.py check \
+    --article ./articles/my-article/article.json \
+    --html ./articles/my-article/article.html
+```
 
 ## 目录结构
 
@@ -118,14 +146,25 @@ wechat-mp-writer/
 │   └── marketplace.json            # Marketplace 注册信息
 ├── skills/
 │   └── wechat-mp-writer/
-│       ├── SKILL.md                # Skill 主文件（完整工作流指令）
+│       ├── SKILL.md                # Skill 主文件（完整工作流指令 + v2 升级）
 │       ├── scripts/
-│       │   ├── wechat_api.py       # 微信API工具（token/素材/草稿/发布）
-│       │   └── compliance_check.py # 内容合规检查
-│       └── references/
-│           ├── content_templates.md    # 8种内容类型模板
-│           ├── wechat_html_compat.md   # 微信HTML兼容性 + 排版组件
-│           └── error_codes.md          # API错误码对照表
+│       │   ├── wechat_api.py         # 微信API工具（token/素材/草稿/发布）
+│       │   ├── compliance_check.py   # v1 合规检查（保留向后兼容）
+│       │   ├── image_search.py       # [v2] 实体级搜词 + 多源抓取 + 去重
+│       │   ├── image_vision_review.py# [v2] Claude Vision 三项审查（对题度/清晰度/手机适配）
+│       │   └── quality_check.py      # [v2] 21 项量化质量闸门
+│       ├── references/
+│       │   ├── content_templates.md    # 8 种内容类型模板（v1）
+│       │   ├── wechat_html_compat.md   # 微信 HTML 兼容性 + 排版组件（v1）
+│       │   ├── error_codes.md          # API 错误码对照表（v1）
+│       │   ├── content-engine.md       # [v2] 三层证据链 + 选题 5 步法 + AI slop 红线 6-10
+│       │   ├── source-grading.md       # [v2] A/B/C/D 分级 + 信任度报告
+│       │   ├── image-pipeline.md       # [v2] 图片 6 段 pipeline + Vision 审查规约
+│       │   ├── layout-variants.md      # [v2] 7 种排版骨架 + 防重复 + 字数 budget
+│       │   └── article-schema.md       # [v2] article.json 中间产物结构
+│       └── assets/
+│           └── examples/
+│               └── sample-article.json # [v2] DeepSeek R1 示例文章的完整 JSON
 ├── README.md
 └── .gitignore
 ```

@@ -1,6 +1,6 @@
 {
   "name": "wechat-mp-writer",
-  "description": "微信公众号内容创作与发布全流程 Skill — 从信息搜集、内容创作、排版到 API 发布的端到端工作流",
+  "description": "微信公众号内容创作与发布全流程 Skill（v2 distiller 级蒸馏产物）— 三层证据链 + 来源分级 + 图片 Vision 审查 + 7 种排版骨架 + 21 项质量闸门",
   "owner": {
     "name": "daizhouchen",
     "url": "https://github.com/daizhouchen"
@@ -8,8 +8,8 @@
   "plugins": [
     {
       "name": "wechat-mp-writer",
-      "description": "微信公众号内容创作与发布 — 主动信息搜集、多模板创作、微信HTML排版、API自动发布",
-      "version": "1.0.0",
+      "description": "微信公众号 v2 内容流水线 — 三层证据链 / Claude Vision 图片审查 / 7 种排版骨架防审美疲劳 / 21 项量化质量闸门 / article.json 结构化中间产物",
+      "version": "2.0.0",
       "source": "./",
       "author": {
         "name": "daizhouchen",

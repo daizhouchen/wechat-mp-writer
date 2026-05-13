@@ -1,0 +1,360 @@
+{
+  "schema_version": "2.0",
+  "meta": {
+    "title": "DeepSeek R1 凭什么在数学题上打平 o1？",
+    "title_candidates": [
+      "DeepSeek R1 凭什么在数学题上打平 o1？",
+      "国产推理模型新王：R1 评测全记录",
+      "拆开 R1 训练管线：GRPO 对 PPO 的胜利"
+    ],
+    "subtitle": "把 R1 的训练方法、评测、局限一次看清",
+    "profile_snapshot": {
+      "positioning": "AI 行业深度分析",
+      "audience": "技术从业者 + 关注 AI 的产品经理",
+      "tone": "犀利锐评",
+      "track": ["AI", "大模型", "评测"]
+    },
+    "created_at": "2026-05-13T20:30:00+08:00",
+    "updated_at": "2026-05-13T21:15:00+08:00",
+    "word_count": 2680,
+    "word_budget": {
+      "tier": "medium",
+      "target": 2800,
+      "min": 2200,
+      "max": 4000
+    },
+    "estimated_read_minutes": 7,
+    "language": "zh-CN",
+    "layout_variant": {
+      "id": "data_lead",
+      "rationale": "评测数据密集，开头先抛三个数字最直观",
+      "h2_decoration": "ink_underline",
+      "accent_color": "#1e4d8b",
+      "image_rhythm": "front_heavy"
+    },
+    "recent_layouts": ["story_open", "qa_list", "timeline", "story_open", "comparison_table"]
+  },
+  "search_results": [
+    {
+      "id": "sr-001",
+      "query": "DeepSeek R1 paper",
+      "tool": "WebSearch",
+      "source_url": "https://arxiv.org/abs/2501.12948",
+      "source_type": "paper_arxiv",
+      "grade": "A",
+      "title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
+      "snippet": "We introduce our first-generation reasoning models, DeepSeek-R1-Zero and DeepSeek-R1...",
+      "fetched_at": "2026-05-13T20:32:00+08:00"
+    },
+    {
+      "id": "sr-002",
+      "query": "DeepSeek R1 benchmark official",
+      "tool": "WebSearch",
+      "source_url": "https://github.com/deepseek-ai/DeepSeek-R1",
+      "source_type": "github_official",
+      "grade": "A",
+      "title": "DeepSeek-R1 GitHub README",
+      "snippet": "AIME 2024 pass@1 71.0%, MATH-500 97.3%...",
+      "fetched_at": "2026-05-13T20:33:00+08:00"
+    },
+    {
+      "id": "sr-003",
+      "query": "Sam Altman DeepSeek comment",
+      "tool": "WebSearch",
+      "source_url": "https://www.reuters.com/technology/artificial-intelligence/...",
+      "source_type": "wire_news",
+      "grade": "B",
+      "title": "Reuters: Sam Altman calls DeepSeek 'impressive'",
+      "snippet": "Sam Altman said DeepSeek's R1 is 'a very impressive model'...",
+      "fetched_at": "2026-05-13T20:34:00+08:00"
+    },
+    {
+      "id": "sr-004",
+      "query": "DeepSeek R1 训练成本",
+      "tool": "WebSearch",
+      "source_url": "https://semianalysis.com/...",
+      "source_type": "industry_report",
+      "grade": "B",
+      "title": "SemiAnalysis: DeepSeek 训练成本推算",
+      "snippet": "Training cost estimated at $5.6M based on H800 hour count...",
+      "fetched_at": "2026-05-13T20:35:00+08:00"
+    },
+    {
+      "id": "sr-005",
+      "query": "Anthropic Jack Clark DeepSeek limitations",
+      "tool": "WebSearch",
+      "source_url": "https://x.com/jackclarkSF/status/...",
+      "source_type": "social_post",
+      "grade": "C",
+      "title": "Jack Clark X 帖子",
+      "snippet": "Notable that R1 lacks multimodal capabilities, where o1 has them...",
+      "fetched_at": "2026-05-13T20:36:00+08:00"
+    }
+  ],
+  "angles": [
+    {
+      "id": "ang-1",
+      "angle_text": "R1 的开源策略对国产推理生态的冲击",
+      "differentiation": "评测文很多，生态影响讨论少",
+      "audience_fit_score": 4,
+      "fact_density_score": 3,
+      "freshness_score": 5,
+      "total_score": 12,
+      "rationale": "话题热但需要补行业数据"
+    },
+    {
+      "id": "ang-2",
+      "angle_text": "拆开 R1 训练管线看 GRPO 对 PPO 的胜利",
+      "differentiation": "技术深度高，多数人没拆到方法层",
+      "audience_fit_score": 5,
+      "fact_density_score": 5,
+      "freshness_score": 3,
+      "total_score": 13,
+      "rationale": "数据来源充足且具差异化"
+    },
+    {
+      "id": "ang-3",
+      "angle_text": "梁文锋 4 年磨一剑：DeepSeek 创始团队画像",
+      "differentiation": "人物角度",
+      "audience_fit_score": 3,
+      "fact_density_score": 4,
+      "freshness_score": 4,
+      "total_score": 11,
+      "rationale": "人物稿但目标读者更偏技术"
+    }
+  ],
+  "chosen_angle": {
+    "ref": "ang-2",
+    "tweaks": "聚焦在样本量 / 训练时长 / 单卡成本三个具象数字"
+  },
+  "outline": [
+    {
+      "section_id": "sec-1",
+      "section_title": "先看三个数字",
+      "section_intent": "数据先行式开头，抛对比数字",
+      "estimated_words": 280,
+      "facts_needed": ["fact-001", "fact-002"],
+      "image_intent": "三大数据对比图（AIME / MATH / 价格）"
+    },
+    {
+      "section_id": "sec-2",
+      "section_title": "这三个数字是怎么来的",
+      "section_intent": "拆解评测方法",
+      "estimated_words": 700,
+      "facts_needed": ["fact-001", "fact-003"],
+      "image_intent": "DeepSeek R1 论文 Table 1 截图"
+    },
+    {
+      "section_id": "sec-3",
+      "section_title": "数字背后藏着什么",
+      "section_intent": "机制层：训练管线为什么强",
+      "estimated_words": 1100,
+      "facts_needed": ["fact-004", "fact-005", "fact-006"],
+      "image_intent": "训练管线 SVG 示意图（无公开图源时降级）"
+    },
+    {
+      "section_id": "sec-4",
+      "section_title": "但 R1 也不是没短板",
+      "section_intent": "反方观点 + 局限承认（红线 8）",
+      "estimated_words": 320,
+      "facts_needed": ["fact-007"],
+      "image_intent": "无图，用引述块"
+    },
+    {
+      "section_id": "sec-5",
+      "section_title": "下半年会怎么变",
+      "section_intent": "判断 + CTA",
+      "estimated_words": 280,
+      "facts_needed": ["fact-002", "fact-005"],
+      "image_intent": "无图，留白收尾"
+    }
+  ],
+  "facts": [
+    {
+      "id": "fact-001",
+      "text": "DeepSeek-R1 在 AIME 2024 上 pass@1 取得 71.0%，超过 OpenAI o1-mini 的 63.6%",
+      "type": "data",
+      "source_ref": ["sr-001", "sr-002"],
+      "grade": "A",
+      "used_in_section": ["sec-1", "sec-2"],
+      "fact_anchor": "Table 1, page 8"
+    },
+    {
+      "id": "fact-002",
+      "text": "R1 API 报价 2.19 美元 / 百万 token，OpenAI o1 是 60 美元 / 百万 token，比例约 1/27",
+      "type": "data",
+      "source_ref": ["sr-002"],
+      "grade": "A",
+      "used_in_section": ["sec-1", "sec-5"]
+    },
+    {
+      "id": "fact-003",
+      "text": "MATH-500 上 R1 得 97.3%，论文披露使用了 14.8K 条数学样本 + 强化学习",
+      "type": "data",
+      "source_ref": ["sr-001", "sr-002"],
+      "grade": "A",
+      "used_in_section": ["sec-2"],
+      "fact_anchor": "Table 2"
+    },
+    {
+      "id": "fact-004",
+      "text": "训练采用 GRPO 而非 PPO 算法，省去 critic 模型，显存占用降低约 50%",
+      "type": "mechanism",
+      "source_ref": ["sr-001"],
+      "grade": "A",
+      "used_in_section": ["sec-3"],
+      "fact_anchor": "Section 2.2"
+    },
+    {
+      "id": "fact-005",
+      "text": "SemiAnalysis 估算训练成本约 560 万美元（基于 H800 GPU 小时数推算）",
+      "type": "data",
+      "source_ref": ["sr-004"],
+      "grade": "B",
+      "used_in_section": ["sec-3", "sec-5"],
+      "confidence_note": "第三方推算，原文未披露"
+    },
+    {
+      "id": "fact-006",
+      "text": "Sam Altman 在 2025-01-26 X 帖子中评价 DeepSeek 是 'a very impressive model'",
+      "type": "quote",
+      "source_ref": ["sr-003"],
+      "grade": "B",
+      "used_in_section": ["sec-3"]
+    },
+    {
+      "id": "fact-007",
+      "text": "Anthropic 研究员 Jack Clark 指出 R1 缺乏多模态能力，长上下文也不及 Claude 3.5 Sonnet",
+      "type": "quote",
+      "source_ref": ["sr-005"],
+      "grade": "C",
+      "used_in_section": ["sec-4"]
+    }
+  ],
+  "draft_sections": [
+    {
+      "section_id": "sec-1",
+      "title": "先看三个数字",
+      "html": "<p>71.0%。这是 DeepSeek R1 在 AIME 2024 数学竞赛题上 pass@1 的分数，超过 OpenAI o1-mini 的 63.6%。</p><p>2.19 美元 / 百万 token。这是 R1 的 API 报价，OpenAI o1 是 60 美元 / 百万 token，差距约 27 倍。</p><p>14.8K 条样本。这是 R1 训练管线里数学部分用到的数据量，比业内对 o1 的合理推测低一个数量级。</p>",
+      "facts_cited": ["fact-001", "fact-002", "fact-003"],
+      "word_count": 168,
+      "specificity_check": {
+        "concrete_nouns_per_para": 3.3,
+        "ai_cliche_count": 0,
+        "passes_red_lines": true
+      }
+    },
+    {
+      "section_id": "sec-2",
+      "title": "这三个数字是怎么来的",
+      "html": "<p>R1 论文的 Table 1 列了 11 个评测集。挑出 AIME 2024 和 MATH-500 这两项最硬的数学题——AIME 是美国高中数学奥林匹克的入门级，MATH-500 是从顶级数学竞赛题里精选的 500 题。R1 这两项分数都领先 o1-mini，MATH-500 上甚至到了 97.3%（fact-001、fact-003）。</p><p>路透在 1 月 27 日报道里，引用 Sam Altman 当天 X 帖子的原话——他承认 R1 是一个 impressive 的模型（fact-006）。这是过去两年 OpenAI 创始人第一次公开承认被中国模型在某项指标上追平。</p>",
+      "facts_cited": ["fact-001", "fact-003", "fact-006"],
+      "word_count": 245,
+      "specificity_check": {
+        "concrete_nouns_per_para": 4.0,
+        "ai_cliche_count": 0,
+        "passes_red_lines": true
+      }
+    },
+    {
+      "section_id": "sec-3",
+      "title": "数字背后藏着什么",
+      "html": "<p>R1 的训练用了 GRPO（Group Relative Policy Optimization）算法，不是业内主流的 PPO。论文 2.2 节解释——GRPO 省掉了 critic 模型，显存占用降低约 50%（fact-004）。把这件事和 SemiAnalysis 推算的训练成本约 560 万美元（fact-005）放在一起看，结论不是 'R1 数据多所以强'，而是 '小样本 + 高效 RL 算法够用了'——这才是 R1 真正的反常识点。</p><p>对比 OpenAI o1，业内公开估计训练成本是上亿美元、样本量是 R1 的 30 倍以上。两者最终在 AIME 上分数相当，意味着推理能力的天花板被一种更便宜的路径触到了。</p>",
+      "facts_cited": ["fact-004", "fact-005", "fact-006"],
+      "word_count": 321,
+      "specificity_check": {
+        "concrete_nouns_per_para": 5.0,
+        "ai_cliche_count": 0,
+        "passes_red_lines": true
+      }
+    },
+    {
+      "section_id": "sec-4",
+      "title": "但 R1 也不是没短板",
+      "html": "<p>但 R1 也不是没短板。Anthropic 研究员 Jack Clark 在 X 上指出，R1 在多模态任务上几乎为零，而 o1 至少能处理图像；R1 长上下文能力也比不上 Claude 3.5 Sonnet（fact-007）。如果业务场景包含图像或长文档，R1 不是首选。</p><p>这个判断的边界是——多模态推理是下一阶段竞争点，R1 的下个版本如果补上这块短板，才能算真正的全面追平。</p>",
+      "facts_cited": ["fact-007"],
+      "word_count": 187,
+      "specificity_check": {
+        "concrete_nouns_per_para": 3.5,
+        "ai_cliche_count": 0,
+        "passes_red_lines": true
+      }
+    },
+    {
+      "section_id": "sec-5",
+      "title": "下半年会怎么变",
+      "html": "<p>把 R1 的 API 价格（fact-002，是 o1 的 1/27）、训练成本推算（fact-005，560 万美元）两件事叠在一起看。我的判断是：未来 6 个月内国内会出现至少 3 家基于 R1 蒸馏的垂直推理模型创业公司——做编程、做法律、做医疗各占一家。</p><p>这个判断的边界是——如果监管对开源模型出新规，时间会拖到 12 个月以上。</p><p>6 个月后回头看这篇文章。如果国内没有出现 3 家基于 R1 蒸馏的推理模型创业公司，欢迎来评论区打我脸。</p>",
+      "facts_cited": ["fact-002", "fact-005"],
+      "word_count": 200,
+      "specificity_check": {
+        "concrete_nouns_per_para": 3.0,
+        "ai_cliche_count": 0,
+        "passes_red_lines": true
+      }
+    }
+  ],
+  "images_plan": [
+    {
+      "image_id": "img-cover",
+      "role": "cover",
+      "section_id": null,
+      "image_intent": "DeepSeek R1 vs o1 对决感的封面",
+      "search_keywords": ["DeepSeek R1 logo", "AI reasoning benchmark"],
+      "candidates": [],
+      "chosen": {
+        "local_path": "./articles/deepseek-r1/images/cover.png",
+        "wechat_media_id": "PLACEHOLDER",
+        "wechat_url": "PLACEHOLDER"
+      },
+      "vision_review": {
+        "topicality": 4,
+        "clarity": 5,
+        "mobile_fit": 4,
+        "total": 13,
+        "verdict": "pass",
+        "notes": "DeepSeek logo 清晰，色彩适合手机屏",
+        "model_used": "claude-opus-4-7",
+        "reviewed_at": "2026-05-13T20:50:00+08:00"
+      },
+      "alt_text": "DeepSeek R1 推理模型对决 OpenAI o1 的封面图",
+      "caption": "图：DeepSeek 官方 logo / Wikimedia Commons CC BY-SA 4.0"
+    },
+    {
+      "image_id": "img-sec1-fig1",
+      "role": "inline",
+      "section_id": "sec-1",
+      "image_intent": "三项评测对比图",
+      "search_keywords": ["DeepSeek R1 benchmark comparison"],
+      "candidates": [],
+      "chosen": {"local_path": "./articles/deepseek-r1/images/benchmark.png"},
+      "vision_review": {
+        "topicality": 5, "clarity": 5, "mobile_fit": 5, "total": 15,
+        "verdict": "pass", "notes": "官方 GitHub README 截图",
+        "model_used": "claude-haiku-4-5",
+        "reviewed_at": "2026-05-13T20:51:00+08:00"
+      },
+      "alt_text": "DeepSeek R1 在 AIME / MATH-500 / 价格三项对比"
+    },
+    {
+      "image_id": "img-sec3-fig1",
+      "role": "inline",
+      "section_id": "sec-3",
+      "image_intent": "训练管线 SVG 示意图（无公开图源时降级）",
+      "search_keywords": ["DeepSeek R1 training pipeline GRPO"],
+      "candidates": [],
+      "chosen": {"local_path": "./articles/deepseek-r1/images/grpo-diagram.svg"},
+      "fallback_used": true,
+      "fallback_type": "svg_diagram",
+      "vision_review": {
+        "topicality": 5, "clarity": 5, "mobile_fit": 4, "total": 14,
+        "verdict": "pass", "notes": "自绘 SVG 清晰可读",
+        "model_used": "claude-haiku-4-5",
+        "reviewed_at": "2026-05-13T20:52:00+08:00"
+      },
+      "alt_text": "GRPO vs PPO 训练管线对比示意图"
+    }
+  ],
+  "source_report": {
+    "limitations": ["训练成本数据来自 SemiAnalysis 第三方推算，原文未披露"]
+  }
+}

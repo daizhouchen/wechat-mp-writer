@@ -1,6 +1,6 @@
 ---
 name: wechat-mp-writer
-description: '微信公众号内容创作与发布全流程 Skill。覆盖从选题、撰写、排版到通过微信公众平台API发布的完整工作流。当用户提到以下场景时务必触发此 skill：写公众号文章、微信推文、公众号排版、公众号发布、草稿箱、封面图上传、微信图文消息、公众号SEO、公众号预览、mp.weixin.qq.com 相关操作、135编辑器/秀米导入、article digest、公众号CTA、微信素材管理、access_token 配置。即使用户没有明确说公众号，只要涉及微信内容创作或发布，也应触发。'
+description: '微信公众号内容创作与发布全流程 Skill（v2，distiller 级蒸馏产物）。覆盖从选题、信息搜集、撰写、排版、图片 vision 审查、量化质量闸门到通过微信公众平台API发布的完整工作流。v2 新增：三层证据链 + A/B/C/D 来源分级 + 文末信任度报告 + 6 段图片 pipeline + Vision 三项审查（对题度/清晰度/手机适配）+ 7 种排版骨架防审美疲劳 + article.json 结构化中间产物 + 21 项量化质量闸门。当用户提到以下场景时务必触发此 skill：写公众号文章、微信推文、公众号排版、公众号发布、草稿箱、封面图上传、微信图文消息、公众号SEO、公众号预览、mp.weixin.qq.com 相关操作、135编辑器/秀米导入、article digest、公众号CTA、微信素材管理、access_token 配置、配图/图片审查/选图/换图/对标新智元/字数控制。即使用户没有明确说公众号，只要涉及微信内容创作或发布，也应触发。'
 ---
 
 # 微信公众号内容创作与发布 Skill
@@ -8,6 +8,19 @@ description: '微信公众号内容创作与发布全流程 Skill。覆盖从选
 本 skill 提供从**主动信息搜集**到内容创作再到微信公众平台发布的端到端能力。
 
 核心理念：**先搜集，再创作，后发布**。AI 是幕后的调研员和排版师，但最终输出的文章必须读起来像一个**人类行业专家**亲笔写的——没有AI味，没有套路感，有观点、有温度、有细节。
+
+---
+
+## v2 升级说明（2026-05）
+
+v2 在 v1 工作流基础上注入"distiller 级蒸馏产物"基础设施。新增 4 块能力：
+
+1. **三层证据链 + 来源 A/B/C/D 分级**——每篇文章末尾自动带"信任度报告"，A 级事实不足 5 条直接判 fail。详见 `references/content-engine.md` + `references/source-grading.md`。
+2. **图片 6 段 pipeline + Vision 审查**——每张图入正文前，必经 Claude Vision 三项打分（对题度 / 清晰度 / 手机适配），不达标自动重搜或降级到 SVG / 引述块。详见 `references/image-pipeline.md`。
+3. **7 种排版骨架 + 防重复机制**——对标新智元等头部公号，每篇随机选骨架 + 强调色 + 装饰，避免连读三篇结构雷同。字数对标公号习惯（短稿 1500-2500 / 中稿 2500-4000 / 长稿 ≤6000，绝不出 distiller 那种 8000+ 字长文）。详见 `references/layout-variants.md`。
+4. **结构化中间产物 article.json + 21 项量化质量闸门**——可改、可量化、可复用，写到一半改某段事实只动 JSON 一个字段。详见 `references/article-schema.md` + `scripts/quality_check.py`。
+
+向后兼容：v1 的 `.wechat-profile.md`、`wechat_api.py`、一条龙模式、五铁律全部保留不动。v2 是基础设施 + 红线扩展，不是 v1 的替代。
 
 ---
 
@@ -49,6 +62,18 @@ description: '微信公众号内容创作与发布全流程 Skill。覆盖从选
 - 视觉层级靠字号和留白，不靠颜色堆砌
 - 整体风格：像一本好杂志，不像一张促销传单
 
+### v2 扩展铁律（红线 6-10）
+
+详见 `references/content-engine.md` §3。这里只列条款：
+
+- **红线 6**：框架名（事实层 / 机制层 / 波特五力 / 马斯洛 / SWOT 等）禁止出现在正文。框架在脑不在纸。
+- **红线 7**：每段 ≥1 个具体名词（人名 / 公司 / 产品 / 年份 / 数字 / 论文标题）。一段全是模糊名词必须重写。
+- **红线 8**：每篇 ≥1 处反方观点或局限承认。单边稿（全唱多 / 全唱衰）一律打回。
+- **红线 9**：禁止"开场白综合症"。正文第一句不能是"在数字化时代""随着 X 的发展""今天我想聊聊"。
+- **红线 10**：禁止"总结八股"。文末不能是"综上所述""总而言之""让我们一起拥抱"。
+
+10 条红线由 `scripts/quality_check.py` 自动扫描，未过闸门不允许进发布流程。
+
 ---
 
 ## 总览：完整工作流
@@ -57,7 +82,7 @@ description: '微信公众号内容创作与发布全流程 Skill。覆盖从选
 用户画像配置（首次/按需）-> 信息搜集 -> 内容创作 -> 排版输出 -> 图片获取与插入 -> 上传素材 -> 存草稿 -> 预览 -> 用户确认 -> 发布
 ```
 
-每一步都有对应的工具和方法，skill 会在预览环节暂停等待用户确认，确保不会误发。
+v2 把上述流程的产物结构化到 `article.json`（详见 `references/article-schema.md`），每一步都有对应字段，写完跑 `quality_check.py` 量化体检。一条龙模式在 v2 下默认开启 vision 审查 + 信任度报告，但用户可在 profile 里关。每一步都有对应的工具和方法，skill 会在预览环节暂停等待用户确认，确保不会误发。
 
 ### 一条龙模式
 
@@ -181,6 +206,8 @@ WECHAT_PREVIEW_USER=your_wechat_id
 
 **这是整个创作流程中最重要的环节。** 用户给出一个主题后，不要直接开始写——先主动搜集信息，确保文章有充足的事实、数据和素材支撑。AI 创作的价值不在于"能写字"，而在于"能帮用户搜集整理他自己需要花几小时才能完成的调研工作"。
 
+**v2 增强**：搜集到的每条素材必须打 A/B/C/D 来源等级（详见 `references/source-grading.md` §2），落到 `article.json.search_results[].grade`。等级直接决定文末"信任度报告"的星级——A ≥ 50% 才能拿 ★★★★。详细方法论见 `references/content-engine.md` §2 选题 5 步法。
+
 ### 3.1 主动搜集的触发时机
 
 收到写作任务后，**立即进入信息搜集阶段**，在动笔之前完成。以下情况尤其需要深度搜集：
@@ -275,6 +302,11 @@ WECHAT_PREVIEW_USER=your_wechat_id
 
 ## 四、内容创作
 
+**v2 总原则（写之前必读）**：
+- **三层证据链**：每篇文章必须有事实层（≥5 条 A 级）→ 机制层（≥2 段显式推导）→ 观点层（≥1 段判断+边界）。详见 `references/content-engine.md` §1。
+- **选骨架**：开始大纲前，先按 `references/layout-variants.md` §4 决策树选 7 种排版骨架之一（落 `article.json.meta.layout_variant.id`），并对照 `meta.recent_layouts` 防重复。
+- **定字数 budget**：按画像 `default_tier` 取 short / medium / long（默认 medium，2500-4000 字），落 `meta.word_budget`。绝对上限 6000 字。
+
 ### 4.1 标题生成
 
 为用户主题生成 **5 个以上候选标题**，涵盖不同风格：
@@ -296,6 +328,8 @@ WECHAT_PREVIEW_USER=your_wechat_id
 - 避免标题党（夸大到与正文不符会被降权）
 - 不要使用微信敏感词（免费领、点击关注、转发有礼 等可能触发风控）
 - 同一个主题至少提供 **3 种不同风格** 的标题
+
+**v2 升级**：候选标题必须 ≥3 个进 `article.json.meta.title_candidates`，每个按"信息密度 / 吸引力 / 可信度"3 项打分（0-5 各项），按 9 分制选最高。配套的 Hook（开篇 200 字）和 CTA（行动召唤）规约见 `references/content-engine.md` §4。
 
 列出所有候选，附上每个标题的风格标签和适用场景分析，让用户选择或修改。
 
@@ -543,6 +577,23 @@ WECHAT_PREVIEW_USER=your_wechat_id
 ## 六、图片获取与插入（必做环节）
 
 公众号文章没有图片就等于没有排版。图片不是可选项，是必须项。每篇文章至少需要 1 张封面图 + 2-4 张正文配图。
+
+**v2 升级：6 段图片 pipeline + Vision 审查（强制）**
+
+完整方法论见 `references/image-pipeline.md`。这里只列调度顺序：
+
+```
+[1] 实体抽取 + 搜词生成   →  scripts/image_search.py query-gen --intent ... --facts ...
+[2] 多源抓取（P1-P5）      →  scripts/image_search.py search --source wikimedia/unsplash/official/local
+[3] 去重（URL + 感知哈希）  →  scripts/image_search.py dedupe --dir ./articles/<slug>/images/
+[4] Vision 审查（每张图）   →  scripts/image_vision_review.py batch --plan ./articles/<slug>/article.json
+[5] 段落匹配（按 intent 评分，不按顺序）→ 写回 article.json.images_plan[].section_id
+[6] 失败回退（重搜 → SVG → 引述块 → 跳过）
+```
+
+**Vision 审查阈值（硬约束）**：每张图三项总分（topicality / clarity / mobile_fit）≥ 10 且任一项 > 2 才能入正文。详见 `image-pipeline.md` §6。
+
+下文 6.1-6.5 的 v1 图片选择原则仍然适用，但实操上**优先用 v2 pipeline**——v1 的"WebSearch 直接搜图"作为 v2 P5 web 兜底使用。
 
 ### 6.1 图片来源优先级
 
@@ -917,7 +968,27 @@ python3 scripts/wechat_api.py publish_status --publish_id "publish_id"
 
 发布前自动执行以下检查：
 
-### 敏感词检测
+### v2 量化质量闸门（强烈推荐先跑这个）
+
+```bash
+python3 scripts/quality_check.py check \
+    --article ./articles/<slug>/article.json \
+    --html ./articles/<slug>/article.html \
+    --history ~/.wechat-history.json
+```
+
+扫描 21 项硬指标，输出彩色终端报告 + 写回 `article.json.compliance_report` + `source_report`。任一 fail 不允许进发布流程。
+
+21 项指标分组：
+- **内容指标**（10）：A 级事实数 ≥5、AI 套话数 = 0、框架名泄漏 = 0、开场白综合症 = 0、总结八股 = 0、每段具体名词覆盖率 ≥80%、字数在 budget 内、反方/局限提示 ≥1、每章节 facts_cited ≥2、标题候选 ≥3
+- **来源指标**（2）：D 级占比 < 30%、source_report 自动算星级
+- **图片指标**（5）：vision pass 率 = 100%、每图带 alt、封面比例对、图文比合理、image_text_ratio 在 300-500 字/图
+- **结构指标**（4）：H2 数对齐章节、首屏字数 ≤ 300、layout_variant 与近 5 篇不同、外链跳转 = 0
+- **微信兼容**（1）：emoji 在正文 = 0
+
+详见 `scripts/quality_check.py` 的 CHECKS_REGISTRY。
+
+### v1 敏感词检测（向后兼容，保留）
 
 运行检查脚本：
 ```bash
@@ -928,6 +999,8 @@ python3 scripts/compliance_check.py --content "<html内容>"
 - **广告法极限词**：最好、最佳、第一、顶级、绝对、100%、永久 等
 - **违禁词**：涉政敏感词、低俗词汇
 - **医疗/金融声明**：如涉及健康或理财内容，提醒添加免责声明
+
+注：v2 quality_check.py 已内含 v1 词库扫描（指标 `compliance_legacy`），单独跑 compliance_check.py 仅在不需要 v2 全量扫描的快速场景使用。
 
 如检测到问题，列出具体位置和替换建议，让用户确认修改。
 
@@ -973,3 +1046,58 @@ python3 scripts/compliance_check.py --content "<html内容>"
 ```
 
 常见错误码对照见 `references/error_codes.md`。
+
+---
+
+## 十二、v2 article.json 工作流（可选但推荐）
+
+v2 推荐把整个创作过程结构化到 `./articles/<slug>/article.json`，参考 `references/article-schema.md` 字段定义和 `assets/examples/sample-article.json` 完整示例。
+
+### 推荐目录结构
+
+```
+./articles/<slug>/
+  ├── article.json              # 中间产物，整篇创作过程的全状态
+  ├── article.html              # 最终成稿（可直接 paste 到公众号编辑器）
+  ├── images/                   # 下载的原图（保留供复用）
+  ├── quality-report.txt        # quality_check.py 输出
+  └── vision-reviews.json       # 所有图片的 vision 审查记录
+```
+
+`<slug>` 为标题英文化或拼音化（如 `deepseek-r1-reasoning`）。
+
+### 推荐工作循环
+
+```
+[1] 接需求 → 创建 ./articles/<slug>/article.json 初始骨架（schema_version + meta + 空 search_results）
+[2] 信息搜集 → 写满 search_results[]，每条带 grade
+[3] 角度生成 → 写满 angles[] (≥3) + chosen_angle
+[4] 选骨架 → meta.layout_variant.id（决策树 layout-variants.md §4）+ 防重复检查
+[5] 大纲 → outline[]
+[6] 事实抽取 → facts[]，每条带 grade + source_ref
+[7] 撰写 → draft_sections[]，每段 cite ≥2 facts
+[8] 图片 pipeline → image_search.py + image_vision_review.py，写满 images_plan[]
+[9] 渲染 → article.html（含末尾"信任度报告"HTML 块）
+[10] 跑 quality_check.py → 必须 21 项 ≥18 项过
+[11] 上传 + 草稿 + 预览 → wechat_api.py
+[12] 用户确认 → 发布
+[13] 把 (slug, variant_id, created_at) 写入 ~/.wechat-history.json，供下次防重复
+```
+
+### 一条龙模式 v2 适配
+
+v2 一条龙模式默认开启：
+- vision 审查（每张图必跑）
+- 信任度报告（自动渲染到文末）
+- quality_check.py（自动跑，failed > 3 自动停下来报告）
+- layout_variant 自动按防重复规则选
+
+用户可在 `.wechat-profile.md` 加 `[v2]` 段关闭某些约束（不推荐）：
+```markdown
+## [v2] 配置
+- vision_review_enabled: true       # false 则跳过 vision 审查
+- min_a_grade_facts: 5               # 调阈值
+- default_tier: medium               # short / medium / long
+- layout_history_path: ~/.wechat-history.json
+```
+
