@@ -201,11 +201,50 @@ def _handle_error(result):
 # ---------------------------------------------------------------------------
 
 def cmd_check(args):
-    """检查 API 凭据是否可用"""
+    """检查 API 凭据是否可用 + 探接口权限矩阵"""
     token = get_access_token(force_refresh=True)
-    print(f"✓ access_token 获取成功")
-    print(f"  Token: {token[:16]}...")
-    print(f"  缓存文件: {TOKEN_CACHE_FILE}")
+    print(f"✓ access_token 获取成功", file=sys.stderr)
+    print(f"  Token: {token[:16]}...", file=sys.stderr)
+    print(f"  缓存文件: {TOKEN_CACHE_FILE}", file=sys.stderr)
+
+    perms = {"draft": False, "publish": False, "preview": False}
+
+    # 探 draft/get 接口（订阅号都有；返 errcode 41001/40001/无 errcode 都算可用）
+    try:
+        r = _api_get("/cgi-bin/draft/count", {"access_token": token})
+        perms["draft"] = r.get("errcode", 0) == 0 or "total_count" in r
+    except Exception:
+        pass
+
+    # 探 freepublish/submit（无 media_id 时会返 41001 而不是 48001 表示有权限）
+    try:
+        r = _api_post_json("/cgi-bin/freepublish/submit",
+                           {"access_token": token},
+                           {"media_id": "__perm_check__"})
+        ec = r.get("errcode", 0)
+        perms["publish"] = ec != 48001  # 48001 = api unauthorized
+    except Exception:
+        pass
+
+    # 探 message/mass/preview
+    try:
+        r = _api_post_json("/cgi-bin/message/mass/preview",
+                           {"access_token": token},
+                           {"touser": "__perm_check__", "mpnews": {"media_id": "__x__"}})
+        ec = r.get("errcode", 0)
+        perms["preview"] = ec != 48001
+    except Exception:
+        pass
+
+    print(file=sys.stderr)
+    print("接口权限矩阵：", file=sys.stderr)
+    for name, ok in perms.items():
+        mark = "✓" if ok else "✗ 48001 unauthorized"
+        print(f"  [{mark}] {name}", file=sys.stderr)
+    if not perms["publish"] and not perms["preview"]:
+        print(file=sys.stderr)
+        print("ℹ 你的账号是个人订阅号 / 未微信认证。可发草稿，发布需后台手动点。", file=sys.stderr)
+    print(json.dumps({"token_ok": True, "permissions": perms}))
 
 
 def cmd_upload_image(args):
@@ -226,8 +265,8 @@ def cmd_upload_image(args):
     ))
 
     if "url" in result:
-        print(f"✓ 图片上传成功")
-        print(f"  URL: {result['url']}")
+        print(f"✓ 图片上传成功", file=sys.stderr)
+        print(f"  URL: {result['url']}", file=sys.stderr)
         print(json.dumps({"url": result["url"]}))
     else:
         print("✗ 图片上传失败", file=sys.stderr)
@@ -242,10 +281,10 @@ def cmd_upload_material(args):
     ))
 
     if "media_id" in result:
-        print(f"✓ 素材上传成功")
-        print(f"  media_id: {result['media_id']}")
+        print(f"✓ 素材上传成功", file=sys.stderr)
+        print(f"  media_id: {result['media_id']}", file=sys.stderr)
         if "url" in result:
-            print(f"  URL: {result['url']}")
+            print(f"  URL: {result['url']}", file=sys.stderr)
         print(json.dumps({"media_id": result["media_id"], "url": result.get("url", "")}))
     else:
         print("✗ 素材上传失败", file=sys.stderr)
@@ -276,11 +315,82 @@ def cmd_add_draft(args):
     ))
 
     if "media_id" in result:
-        print(f"✓ 草稿添加成功")
-        print(f"  media_id: {result['media_id']}")
+        print(f"✓ 草稿添加成功", file=sys.stderr)
+        print(f"  media_id: {result['media_id']}", file=sys.stderr)
         print(json.dumps({"media_id": result["media_id"]}))
     else:
         print("✗ 草稿添加失败", file=sys.stderr)
+
+
+def cmd_update_draft(args):
+    """更新已有草稿（覆盖整篇）— 解决草稿堆积"""
+    article = {
+        "title": args.title,
+        "content": args.content,
+        "digest": args.digest or "",
+        "thumb_media_id": args.thumb_media_id,
+        "author": args.author or "",
+        "need_open_comment": args.need_open_comment,
+        "only_fans_can_comment": args.only_fans_can_comment,
+    }
+    if os.path.isfile(args.content):
+        with open(args.content, "r", encoding="utf-8") as f:
+            article["content"] = f.read()
+
+    body = {"media_id": args.media_id, "index": args.index, "articles": article}
+
+    result = _call_with_retry(lambda: _api_post_json(
+        "/cgi-bin/draft/update",
+        {"access_token": get_access_token()},
+        body,
+    ))
+
+    if result.get("errcode", 0) == 0:
+        print(f"✓ 草稿更新成功", file=sys.stderr)
+        print(f"  media_id: {args.media_id} (index {args.index})", file=sys.stderr)
+        print(json.dumps({"media_id": args.media_id, "index": args.index, "updated": True}))
+    else:
+        print("✗ 草稿更新失败", file=sys.stderr)
+
+
+def cmd_delete_draft(args):
+    """删除草稿"""
+    body = {"media_id": args.media_id}
+    result = _call_with_retry(lambda: _api_post_json(
+        "/cgi-bin/draft/delete",
+        {"access_token": get_access_token()},
+        body,
+    ))
+    if result.get("errcode", 0) == 0:
+        print(f"✓ 草稿已删除", file=sys.stderr)
+        print(f"  media_id: {args.media_id}", file=sys.stderr)
+        print(json.dumps({"media_id": args.media_id, "deleted": True}))
+    else:
+        print("✗ 草稿删除失败", file=sys.stderr)
+
+
+def cmd_list_drafts(args):
+    """列草稿箱（用于找到要更新/删除的 media_id）"""
+    result = _call_with_retry(lambda: _api_get(
+        "/cgi-bin/draft/batchget",
+        {"access_token": get_access_token(), "offset": args.offset, "count": args.count, "no_content": 1},
+    ))
+    if "item" in result:
+        items = []
+        for it in result["item"]:
+            news = it.get("content", {}).get("news_item", [{}])[0]
+            items.append({
+                "media_id": it.get("media_id"),
+                "title": news.get("title", ""),
+                "update_time": it.get("update_time", 0),
+            })
+        print(f"✓ 草稿箱共 {result.get('total_count', '?')} 篇，本次返回 {len(items)} 条", file=sys.stderr)
+        for it in items:
+            ts = it["update_time"]
+            print(f"  [{ts}] {it['media_id'][:20]}...  {it['title']}", file=sys.stderr)
+        print(json.dumps({"items": items, "total": result.get("total_count", 0)}, ensure_ascii=False))
+    else:
+        print("✗ 列出草稿失败", file=sys.stderr)
 
 
 def cmd_preview(args):
@@ -312,8 +422,8 @@ def cmd_preview(args):
     ))
 
     if result.get("errcode", 0) == 0:
-        print(f"✓ 预览发送成功")
-        print(f"  msg_id: {result.get('msg_id', 'N/A')}")
+        print(f"✓ 预览发送成功", file=sys.stderr)
+        print(f"  msg_id: {result.get('msg_id', 'N/A')}", file=sys.stderr)
     else:
         print("✗ 预览发送失败", file=sys.stderr)
 
@@ -327,8 +437,8 @@ def cmd_publish(args):
     ))
 
     if "publish_id" in result:
-        print(f"✓ 发布提交成功")
-        print(f"  publish_id: {result['publish_id']}")
+        print(f"✓ 发布提交成功", file=sys.stderr)
+        print(f"  publish_id: {result['publish_id']}", file=sys.stderr)
         print(json.dumps({"publish_id": result["publish_id"]}))
     else:
         print("✗ 发布提交失败", file=sys.stderr)
@@ -345,12 +455,12 @@ def cmd_publish_status(args):
     if "publish_status" in result:
         status_map = {0: "发布成功", 1: "发布中", 2: "原文已删除", 3: "发布失败"}
         status = result["publish_status"]
-        print(f"发布状态：{status_map.get(status, f'未知({status})')}")
+        print(f"发布状态：{status_map.get(status, f'未知({status})')}", file=sys.stderr)
         if status == 0 and "article_detail" in result:
             for item in result["article_detail"].get("item", []):
                 article_url = item.get("article_url", "")
                 if article_url:
-                    print(f"  文章链接：{article_url}")
+                    print(f"  文章链接：{article_url}", file=sys.stderr)
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print("✗ 查询失败", file=sys.stderr)
@@ -387,6 +497,27 @@ def main():
     p.add_argument("--need_open_comment", type=int, default=1, help="是否开启评论")
     p.add_argument("--only_fans_can_comment", type=int, default=0, help="是否仅粉丝可评论")
 
+    # update_draft
+    p = sub.add_parser("update_draft", help="更新已有草稿（覆盖）")
+    p.add_argument("--media_id", required=True, help="目标草稿 media_id")
+    p.add_argument("--index", type=int, default=0, help="多图文中的第几篇（默认 0）")
+    p.add_argument("--title", required=True)
+    p.add_argument("--content", required=True, help="HTML内容或文件路径")
+    p.add_argument("--digest", default="")
+    p.add_argument("--thumb_media_id", required=True)
+    p.add_argument("--author", default="")
+    p.add_argument("--need_open_comment", type=int, default=1)
+    p.add_argument("--only_fans_can_comment", type=int, default=0)
+
+    # delete_draft
+    p = sub.add_parser("delete_draft", help="删除草稿")
+    p.add_argument("--media_id", required=True)
+
+    # list_drafts
+    p = sub.add_parser("list_drafts", help="列草稿箱")
+    p.add_argument("--offset", type=int, default=0)
+    p.add_argument("--count", type=int, default=20)
+
     # preview
     p = sub.add_parser("preview", help="发送预览")
     p.add_argument("--media_id", required=True, help="草稿 media_id")
@@ -411,6 +542,9 @@ def main():
         "upload_image": cmd_upload_image,
         "upload_material": cmd_upload_material,
         "add_draft": cmd_add_draft,
+        "update_draft": cmd_update_draft,
+        "delete_draft": cmd_delete_draft,
+        "list_drafts": cmd_list_drafts,
         "preview": cmd_preview,
         "publish": cmd_publish,
         "publish_status": cmd_publish_status,

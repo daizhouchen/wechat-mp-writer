@@ -104,6 +104,32 @@ def count_chinese_chars(text: str) -> int:
     return sum(1 for ch in text if "一" <= ch <= "鿿")
 
 
+def count_mixed_reading_length(text: str) -> int:
+    """v2.1 混合阅读量算法：中文字符 × 1 + 英文 token × 0.5
+    替代纯中文计数——避免低估"OpenAI Anthropic Sam Altman"等大量英文实体的科技文。
+    """
+    zh = sum(1 for ch in text if "一" <= ch <= "鿿")
+    en_tokens = len(re.findall(r"[A-Za-z]+", text))
+    return zh + int(en_tokens * 0.5)
+
+
+def utf8_byte_size(s: str) -> int:
+    return len(s.encode("utf-8"))
+
+
+# v2.1 AI 痕迹清单（成稿 HTML 不应出现）
+AI_TRACE_PATTERNS = [
+    r"信任度报告", r"置信度评分", r"置信度.{0,3}星",
+    r"来源透明度", r"A\s*占比.*?%",
+    r"图\s*[:：].{0,30}(Wikimedia|CC[\-\s]?BY|来源)",
+    r"未核证", r"据.{0,8}推算",
+    r"fact-\d+", r"sr-\d+", r"img-\w+",
+    r"由\s*claude\s*生成", r"AI\s*工具.{0,10}产出",
+    r"vision_review", r"source_report", r"compliance_report",
+    r"★{2,}",  # 信任度星
+]
+
+
 def has_concrete_noun(text: str) -> bool:
     """段落里是否有具体名词（人/年份/数字/英文实体名）。"""
     if re.search(r"\d{4}", text):  # 年份
@@ -201,19 +227,63 @@ def check_concrete_noun_per_para(article: dict) -> dict:
 
 
 def check_word_count(article: dict, plain: str) -> dict:
-    wc = count_chinese_chars(plain)
+    """v2.1 改用混合阅读量算法（中文 + 英文 token × 0.5）"""
+    wc = count_mixed_reading_length(plain)
     budget = (article.get("meta") or {}).get("word_budget") or {}
-    target_min = budget.get("min", 1500)
-    target_max = budget.get("max", 4000)
+    target_min = budget.get("min", 3500)
+    target_max = budget.get("max", 5500)
+    hard_limit = 8000  # v2.1 硬上限上调
     in_range = target_min <= wc <= target_max
-    note = f"字数 {wc}（budget {target_min}-{target_max}）"
-    if wc > 6000:
-        return _build("word_count", wc, "<=6000", False,
-                      note=f"{note} · 超过 6000 硬上限",
-                      suggestion="拆成系列文，单篇控制在 6000 字内")
+    note = f"阅读量 {wc}（budget {target_min}-{target_max}，中英混合算法）"
+    if wc > hard_limit:
+        return _build("word_count", wc, f"<={hard_limit}", False,
+                      note=f"{note} · 超过 {hard_limit} 硬上限",
+                      suggestion=f"拆成系列文，单篇控制在 {hard_limit} 字内")
     return _build("word_count", wc, f"{target_min}-{target_max}", in_range,
                   note=note,
-                  suggestion="按 budget 增删段落")
+                  suggestion="按 budget 增删段落（深稿建议 medium 3500-5500）")
+
+
+def check_digest_byte_size(article: dict) -> dict:
+    """v2.1 新增：微信 digest 上限 120 字节（不是 120 字符），中文 ~40 字"""
+    digest = (article.get("meta") or {}).get("digest", "") or ""
+    bytes_n = utf8_byte_size(digest)
+    return _build("digest_byte_size", bytes_n, "<=120", bytes_n <= 120,
+                  note=f"摘要 {bytes_n} 字节（{len(digest)} 字符）",
+                  suggestion="压到 ~40 中文字符（每个汉字 3 字节，120/3=40）")
+
+
+def check_material_utilization(article: dict) -> dict:
+    """v2.1 新增：素材榨干率 — 搜了的 search_results 至少 80% 在 facts 被引用"""
+    sr = article.get("search_results", [])
+    facts = article.get("facts", [])
+    if not sr:
+        return _build("material_utilization", "n/a", ">=80%", True, note="无 search_results")
+
+    cited = set()
+    for f in facts:
+        for ref in f.get("source_ref", []):
+            cited.add(ref)
+
+    used = sum(1 for s in sr if s.get("id") in cited)
+    pct = round(used / len(sr) * 100, 1)
+    passed = pct >= 80
+    sev = "fail" if pct < 40 else ("warn" if pct < 60 else "ok")
+    return _build("material_utilization", f"{pct}%", ">=80%", passed,
+                  note=f"搜 {len(sr)} 条，引用 {used} 条（{sev}）",
+                  suggestion="补 facts 引用未用素材，或删除未用 search_results")
+
+
+def check_ai_traces(plain: str) -> dict:
+    """v2.1 新增：扫成稿 HTML 里有无 AI 痕迹"""
+    hits = []
+    for pat in AI_TRACE_PATTERNS:
+        for m in re.finditer(pat, plain):
+            hits.append(m.group(0)[:30])
+    uniq = list(dict.fromkeys(hits))[:5]  # 去重 + 截前 5
+    return _build("ai_traces", len(hits), "==0", len(hits) == 0,
+                  note=f"AI 痕迹命中 {len(hits)} 处" + (f"：{uniq}" if uniq else ""),
+                  suggestion="把信任度报告/图来源标注/内部 ID/AI tagline 全部从 HTML 移除（只留在 article.json 内部）")
 
 
 def check_layout_variety(article: dict, history_path: str | None) -> dict:
@@ -462,12 +532,15 @@ def _build(name, value, threshold, passed, note="", suggestion=""):
 CHECKS_REGISTRY = [
     ("a_grade_facts", lambda a, h, p, hist: check_a_grade_facts(a)),
     ("d_grade_ratio", lambda a, h, p, hist: check_d_grade_ratio(a)),
+    ("material_utilization", lambda a, h, p, hist: check_material_utilization(a)),  # v2.1 新增
     ("ai_cliches", lambda a, h, p, hist: check_ai_cliches(a, p)),
+    ("ai_traces", lambda a, h, p, hist: check_ai_traces(p)),  # v2.1 新增
     ("framework_names", lambda a, h, p, hist: check_framework_names(p)),
     ("opening_cliches", lambda a, h, p, hist: check_opening_clichés(a)),
     ("ending_cliches", lambda a, h, p, hist: check_ending_clichés(a)),
     ("concrete_noun", lambda a, h, p, hist: check_concrete_noun_per_para(a)),
-    ("word_count", lambda a, h, p, hist: check_word_count(a, p)),
+    ("word_count", lambda a, h, p, hist: check_word_count(a, p)),  # v2.1 改混合算法
+    ("digest_byte_size", lambda a, h, p, hist: check_digest_byte_size(a)),  # v2.1 新增
     ("layout_variety", lambda a, h, p, hist: check_layout_variety(a, hist)),
     ("vision_pass", lambda a, h, p, hist: check_image_vision_pass(a)),
     ("alt_text", lambda a, h, p, hist: check_image_alt_text(a)),

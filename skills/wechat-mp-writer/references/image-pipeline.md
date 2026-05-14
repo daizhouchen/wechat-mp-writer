@@ -160,14 +160,51 @@ wechat_api.py 上传 + 草稿（回填 wechat_media_id / wechat_url）
 
 **每张备选图入正文前必须跑一次 vision 审查**。这是 v2 不可绕过的硬约束。审查不通过的图禁止进入 `chosen` 字段，只能留在 `candidates` 里供事后追查。
 
-### 调用什么模型
+### v2.1 重大变化：Claude 自身 vision 是首选路径
+
+> 在 Claude Code 交互式会话里，**直接用 Read 工具看图就能做 vision 审查**——不需要 ANTHROPIC_API_KEY，不需要跑 image_vision_review.py。这是 v2.1 的核心简化。
+
+| 场景 | 推荐路径 | 何时用 |
+|---|---|---|
+| **★ 交互式会话（默认）** | **Claude Code 自身能力**：用 Read 工具读图 → 直接打三项分 → 写回 article.json.images_plan[i].vision_review | 用户在 Claude Code 里跟你协作写文章——这是 99% 情况 |
+| 批量 / 自动化场景 | `scripts/image_vision_review.py batch --plan article.json` (调 Claude API) | sub-agent 跑、CI、夜间批处理；需要 ANTHROPIC_API_KEY |
+
+**Claude 自身 vision 的标准动作**（每张候选图执行一次）：
+
+```
+1. Read tool 读图（./articles/<slug>/images/<filename>.png）
+2. 按 §6 三项标准打分（topicality / clarity / mobile_fit 各 0-5）
+3. 写回 article.json.images_plan[i].vision_review：
+   {
+     "topicality": <int 0-5>,
+     "clarity": <int 0-5>,
+     "mobile_fit": <int 0-5>,
+     "total": <topicality + clarity + mobile_fit>,
+     "verdict": "pass" 或 "fail",
+     "notes": "<50 字内中文>",
+     "model_used": "claude-opus-4-7-builtin (Read-tool vision)",
+     "reviewed_at": "<ISO 时间戳>"
+   }
+4. verdict=fail 触发 §8 失败回退
+```
+
+无须任何外部 API 调用 — Claude Code 模型本身就是 vision 模型。
+
+### 旧路径：scripts/image_vision_review.py（备选）
+
+仅当以下场景用：
+- sub-agent 跑（spawn 出去的 agent 没有交互式 Read 能力时）
+- 批量审查 ≥20 张图（用 haiku 比手动 Read 快）
+- CI / 自动化（无人值守）
+
+模型选择：
 
 | 场景 | 模型 | 理由 |
 |------|------|------|
 | 默认（速度优先） | `claude-haiku-4-5` | 单图 1-2s，准确度够 |
 | 高质量场景（精度优先） | `claude-opus-4-7` | 单图 3-5s，遇到拿不准的图更稳 |
 
-用户可在 `~/.wechat-profile.md` 配置默认值。SKILL.md §6 调度时读这个配置。
+用户可在 `~/.wechat-profile.md` 的 `vision_review_via` 字段切换 `claude_self`（默认） / `script`。
 
 审查结果写入 `images_plan[i].vision_review`（字段定义见 article-schema.md）。
 
@@ -373,8 +410,139 @@ verdict = fail  ⟺  total < 10   OR  any item ≤ 2
 3. 封面图是 2.35:1 吗？topicality 和 clarity 都 ≥4 吗？
 4. 段落图是按 `image_intent` 匹配的，还是按下标顺序硬塞的？
 5. 全文图文比在 300-500 字 / 图 区间吗？（quality_check.py 输出）
-6. 所有图都有 `alt_text` 和 `caption` 吗？caption 标了来源 / license 吗？
+6. 所有图都有 `alt_text` 吗？（**caption 默认不渲染——见去 AI 痕迹章节**）
 7. 有没有图触发了 `low_confidence_match`？是否人工复核过？
+
+---
+
+## 12. 封面 SVG 模板库（v2.1 新增 · fallback 用）
+
+无现成图源时降级到自绘 SVG 封面，4 种模板覆盖深稿场景。每种都解决了已知 baseline 对齐等坑。
+
+### 模板 12.1 数据反差型（适用：薪资 / 数据对比 / 横评开头）
+
+```html
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1175 500" font-family="-apple-system, 'PingFang SC', sans-serif">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a1a1a"/><stop offset="1" stop-color="#2a2018"/></linearGradient></defs>
+  <rect width="1175" height="500" fill="url(#bg)"/>
+  <text x="60" y="80" font-size="22" fill="#7a5500" letter-spacing="4">CATEGORY · YEAR</text>
+  <!-- 关键：vs 用 dominant-baseline=central + 单独 y，避免不同字号 baseline 对齐塌 -->
+  <text x="60" y="220" font-size="100" font-weight="bold" fill="#fdf8ee">$500K</text>
+  <text x="430" y="190" font-size="60" font-weight="300" fill="#7a5500" dominant-baseline="central" font-style="italic">vs</text>
+  <text x="540" y="220" font-size="100" font-weight="bold" fill="#fdf8ee">月薪 4 万</text>
+  <text x="60" y="305" font-size="42" font-weight="500" fill="#fdf8ee" letter-spacing="2">真假 AI PM 分水岭</text>
+  <line x1="60" y1="395" x2="1115" y2="395" stroke="#7a5500" stroke-width="1" opacity="0.5"/>
+  <text x="60" y="445" font-size="26" fill="#fdf8ee">Anthropic · OpenAI · Google AI · 字节 · 阿里</text>
+  <text x="1115" y="480" font-size="16" fill="#888" text-anchor="end" letter-spacing="2">A what I</text>
+</svg>
+```
+
+**关键技术点**：
+- 不同字号文字混排时**必须** `dominant-baseline="central"` 单独 y 定位，否则 alphabetic baseline 让小字下沉
+- 深底（#1a1a1a）+ 米白字（#fdf8ee）+ 暖橙强调（#7a5500），三色克制
+- 公司名行用 ` · ` 分隔（**不要用 emoji 或多种 dingbat**，会被 quality_check 的 emoji 词库扫到）
+
+### 模板 12.2 大字标语型（适用：观点 / 反常识结论开头）
+
+```html
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1175 500" font-family="-apple-system, 'PingFang SC', sans-serif">
+  <rect width="1175" height="500" fill="#fdf8ee"/>
+  <line x1="60" y1="60" x2="200" y2="60" stroke="#7a5500" stroke-width="3"/>
+  <text x="60" y="100" font-size="20" fill="#7a5500" letter-spacing="3">2026 年 5 月</text>
+  <text x="60" y="200" font-size="64" font-weight="bold" fill="#1a1a1a">大字标语第一行</text>
+  <text x="60" y="280" font-size="64" font-weight="bold" fill="#7a5500">大字标语第二行（重音）</text>
+  <text x="60" y="430" font-size="22" fill="#666">— 副标题 / 一句话总结</text>
+  <text x="1115" y="480" font-size="16" fill="#999" text-anchor="end" letter-spacing="2">A what I</text>
+</svg>
+```
+
+### 模板 12.3 公司 logo 拼接型（适用：横评 / 行业全景）
+
+```html
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1175 500" font-family="-apple-system, 'PingFang SC', sans-serif">
+  <rect width="1175" height="500" fill="#1a1a1a"/>
+  <text x="60" y="100" font-size="56" font-weight="bold" fill="#fdf8ee">2026 AI 横评</text>
+  <text x="60" y="160" font-size="22" fill="#7a5500" letter-spacing="2">8 家公司一次拆开看</text>
+
+  <!-- 横向排 Anthropic / OpenAI / Google / Meta / 阿里 / 字节 / 美团 / DeepSeek -->
+  <text x="60" y="280" font-size="32" font-weight="600" fill="#fdf8ee">Anthropic</text>
+  <text x="280" y="280" font-size="32" fill="#7a5500">·</text>
+  <text x="320" y="280" font-size="32" font-weight="600" fill="#fdf8ee">OpenAI</text>
+  <text x="490" y="280" font-size="32" fill="#7a5500">·</text>
+  <text x="530" y="280" font-size="32" font-weight="600" fill="#fdf8ee">Google</text>
+  <text x="700" y="280" font-size="32" fill="#7a5500">·</text>
+  <text x="740" y="280" font-size="32" font-weight="600" fill="#fdf8ee">Meta</text>
+  <text x="60" y="350" font-size="32" font-weight="600" fill="#fdf8ee">阿里</text>
+  <text x="180" y="350" font-size="32" fill="#7a5500">·</text>
+  <text x="220" y="350" font-size="32" font-weight="600" fill="#fdf8ee">字节</text>
+  <text x="340" y="350" font-size="32" fill="#7a5500">·</text>
+  <text x="380" y="350" font-size="32" font-weight="600" fill="#fdf8ee">美团</text>
+  <text x="500" y="350" font-size="32" fill="#7a5500">·</text>
+  <text x="540" y="350" font-size="32" font-weight="600" fill="#fdf8ee">DeepSeek</text>
+
+  <text x="1115" y="480" font-size="16" fill="#888" text-anchor="end" letter-spacing="2">A what I</text>
+</svg>
+```
+
+### 模板 12.4 时间线型（适用：发展史 / 年终盘点）
+
+```html
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1175 500" font-family="-apple-system, 'PingFang SC', sans-serif">
+  <rect width="1175" height="500" fill="#fdf8ee"/>
+  <text x="60" y="80" font-size="40" font-weight="bold" fill="#1a1a1a">主标题在这里</text>
+  <text x="60" y="120" font-size="20" fill="#7a5500">2017 → 2026 · 一条时间线看清</text>
+
+  <!-- 横向时间线 -->
+  <line x1="80" y1="280" x2="1095" y2="280" stroke="#7a5500" stroke-width="2"/>
+  <circle cx="180" cy="280" r="8" fill="#7a5500"/>
+  <text x="180" y="320" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">2017</text>
+  <text x="180" y="345" text-anchor="middle" font-size="14" fill="#666">起点</text>
+  <circle cx="430" cy="280" r="8" fill="#7a5500"/>
+  <text x="430" y="320" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">2020</text>
+  <text x="430" y="345" text-anchor="middle" font-size="14" fill="#666">转折</text>
+  <circle cx="680" cy="280" r="8" fill="#7a5500"/>
+  <text x="680" y="320" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">2023</text>
+  <text x="680" y="345" text-anchor="middle" font-size="14" fill="#666">爆发</text>
+  <circle cx="930" cy="280" r="14" fill="#7a5500" stroke="#fdf8ee" stroke-width="3"/>
+  <text x="930" y="325" text-anchor="middle" font-size="22" font-weight="bold" fill="#7a5500">2026</text>
+  <text x="930" y="350" text-anchor="middle" font-size="14" fill="#666">现在</text>
+
+  <text x="1115" y="480" font-size="16" fill="#999" text-anchor="end" letter-spacing="2">A what I</text>
+</svg>
+```
+
+### 通用渲染流程
+
+SVG → PNG（公众号上传需要 PNG）：
+1. 写 SVG 到 `./articles/<slug>/images/cover-render.html`（带 viewport 设置）
+2. 用 playwright 起 http server + 截图，输出 `cover.png`
+3. Read 工具看一眼新 PNG 做 vision 审查
+4. 走 publish.sh 上传
+
+具体 playwright 截图代码见 `~/.claude/skills/wechat-mp-writer/scripts/publish.sh` 注释。
+
+---
+
+## 13. 图片渲染默认值（v2.1 新增）
+
+**所有 inline 图片必须带圆角 + 阴影**。裸图禁止。详细模板见 `references/layout-components.md` 组件 9。
+
+```css
+/* 普通正文图 */
+border-radius: 8px;
+box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+
+/* 封面图（更厚阴影） */
+border-radius: 8px;
+box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+
+/* 实体 logo（深底白图标，需加 padding 提升可读性） */
+border-radius: 8px;
+background: #1a1a1a;
+padding: 24px;
+```
+
+quality_check.py 加扫描：所有 `<img>` 必须有 `border-radius`，否则 warn。
 8. 降级图（SVG / quote_block）是否被用户知会？
 9. 上传后每张图都拿到 `wechat_media_id` 了吗？没拿到的是哪张、为什么？
 10. `vision-reviews.json` 是否完整保留（事后追查能复现判定）？

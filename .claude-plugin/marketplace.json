@@ -9,7 +9,7 @@
     {
       "name": "wechat-mp-writer",
       "description": "微信公众号 v2 内容流水线 — 三层证据链 / Claude Vision 图片审查 / 7 种排版骨架防审美疲劳 / 21 项量化质量闸门 / article.json 结构化中间产物",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "source": "./",
       "author": {
         "name": "daizhouchen",
