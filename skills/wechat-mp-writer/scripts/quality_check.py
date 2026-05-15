@@ -274,6 +274,71 @@ def check_material_utilization(article: dict) -> dict:
                   suggestion="补 facts 引用未用素材，或删除未用 search_results")
 
 
+# v2.1.2 主题 → 风格匹配表
+TOPIC_STYLE_MAPPING = {
+    "tech_deep":  ["横评", "对比", "评测", "数据", "榜单", "估值", "薪资", "benchmark", "vs"],
+    "cultural":   ["故事", "人物", "创始人", "离开", "创业", "反思", "批评", "文化", "价值观", "押注", "天花板", "讲故事"],
+    "finance":    ["财报", "估值", "监管", "政策", "上市", "财经", "投行", "央行", "融资", "IPO"],
+    "tutorial":   ["教程", "上手", "指南", "How-to", "工具", "清单", "步骤", "Top", "实操"],
+    "retrospect": ["盘点", "年终", "演变", "历史", "周年", "大事件", "编年", "回顾"],
+}
+
+
+def check_style_topic_fit(article: dict) -> dict:
+    """v2.1.2 新增：当前 style_preset 是否匹配主题关键词"""
+    meta = article.get("meta") or {}
+    layout = meta.get("layout_variant") or {}
+
+    # 当前用的 style：由 (accent_color, h2_decoration, cover_template) 推断 preset
+    accent = layout.get("accent_color", "")
+    h2_dec = layout.get("h2_decoration", "")
+    inferred_preset = None
+    presets = {
+        "tech_deep":  ("#7a5500", "chapter_number"),
+        "cultural":   ("#8b3a3a", "classic_chinese_serial"),
+        "finance":    ("#1e4d8b", "block_left_bar"),
+        "tutorial":   ("#5c4a3a", "number_prefix"),
+        "retrospect": ("#c62828", "dash_decoration"),
+    }
+    for name, (acc, h2) in presets.items():
+        if accent == acc or h2_dec == h2:
+            inferred_preset = name
+            break
+
+    # 主题文本：title + subtitle + chosen_angle
+    title = meta.get("title", "")
+    subtitle = meta.get("subtitle", "")
+    angle = (article.get("chosen_angle") or {}).get("ref", "")
+    angles = {a.get("id"): a.get("angle_text", "") for a in article.get("angles", [])}
+    angle_text = angles.get(angle, "")
+    topic_text = f"{title} {subtitle} {angle_text}"
+
+    # 主题命中哪些 preset
+    matched_presets = []
+    for preset, kws in TOPIC_STYLE_MAPPING.items():
+        for kw in kws:
+            if kw in topic_text:
+                matched_presets.append(preset)
+                break
+
+    if not matched_presets:
+        return _build("style_topic_fit", "n/a", "topic ambiguous", True,
+                      note="主题不明确，跳过适配检查（用 profile.style_default）")
+
+    if not inferred_preset:
+        return _build("style_topic_fit", "unknown", "set style_preset", False,
+                      note="未设 layout_variant.accent_color，无法推断 preset",
+                      suggestion="按 SKILL.md 主题适配章节选 5 preset 之一")
+
+    if inferred_preset in matched_presets:
+        return _build("style_topic_fit", inferred_preset, f"in {matched_presets}", True,
+                      note=f"风格 {inferred_preset} 匹配主题命中的 preset {matched_presets}")
+
+    return _build("style_topic_fit", inferred_preset, f"should be in {matched_presets}", False,
+                  note=f"风格 {inferred_preset} 与主题不匹配——主题命中 {matched_presets}",
+                  suggestion=f"换风格到 {matched_presets[0]}（详见 SKILL.md 主题→风格适配章节）")
+
+
 def check_ai_traces(plain: str) -> dict:
     """v2.1 新增：扫成稿 HTML 里有无 AI 痕迹"""
     hits = []
@@ -535,6 +600,7 @@ CHECKS_REGISTRY = [
     ("material_utilization", lambda a, h, p, hist: check_material_utilization(a)),  # v2.1 新增
     ("ai_cliches", lambda a, h, p, hist: check_ai_cliches(a, p)),
     ("ai_traces", lambda a, h, p, hist: check_ai_traces(p)),  # v2.1 新增
+    ("style_topic_fit", lambda a, h, p, hist: check_style_topic_fit(a)),  # v2.1.2 新增
     ("framework_names", lambda a, h, p, hist: check_framework_names(p)),
     ("opening_cliches", lambda a, h, p, hist: check_opening_clichés(a)),
     ("ending_cliches", lambda a, h, p, hist: check_ending_clichés(a)),
