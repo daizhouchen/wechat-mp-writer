@@ -1255,6 +1255,71 @@ profile 改动后，下次跑 publish.sh 自动同步；当前在写的稿子需
 
 ---
 
+## 视觉风格防重复（v2.1.1 新增 · 关键）
+
+> 实战教训：仅换骨架 ID（comparison_table → list_breakdown）是**不够的**。如果两篇都用暖橙 + 章节大数字 + pull quote + persona 卡，读者依然觉得"是同一个号在写"。**视觉记忆 ≠ 骨架名字**。
+
+每篇文章必须更新一个 **`style_signature`** —— 5 维度的视觉指纹，要求和近 3 篇至少 **3 个维度不同**。
+
+### 5 维度风格签名
+
+| 维度 | 取值范围 | 例子 |
+|---|---|---|
+| `accent_color` | #7a5500 暖橙 / #8b3a3a 朱砂 / #1e4d8b 深青 / #5c4a3a 大地色 / #c62828 中国红 | 主色调 |
+| `page_bg` | #fff 纯白 / #fdf8ed 浅米黄 / #f5f0e8 卡片米 / #f7f7f8 灰白 | 整页底色 |
+| `font_family` | -apple-system + 无衬线（默认）/ Songti SC 宋体 / Kaiti SC 楷体 | 主字体感 |
+| `h2_decoration` | `chapter_number`（01 大数字）/ `classic_chinese_serial`（其一其二）/ `block_left_bar`（左竖条）/ `dash_decoration`（— X —）/ `number_prefix`（数字前缀） | H2 装饰风 |
+| `cover_template` | `data_contrast`（数字反差）/ `slogan_large`（大字标语）/ `logo_collage`（公司拼接）/ `timeline`（时间线）/ `quote_lead`（引语开篇）  | 封面类型 |
+
+### 防重复规则
+
+```
+必须和近 3 篇 ≥3 个维度不同
+若 ≥4 维度相同 → quality_check 标 fail（视觉抄自己）
+若 3 维度相同 → warn（强烈建议换 1-2 个）
+```
+
+### 5 个组合速查（典型搭配）
+
+| 组合 | accent_color | page_bg | font | h2_decoration | cover_template | 适合主题 |
+|---|---|---|---|---|---|---|
+| **科技深稿** | #7a5500 暖橙 | #fff | sans | chapter_number | data_contrast | AI/技术评论 |
+| **文化引语** | #8b3a3a 朱砂 | #fdf8ed | Songti SC | classic_chinese_serial | slogan_large | 人物/文化/故事 |
+| **金融报告** | #1e4d8b 深青 | #f7f7f8 | sans | block_left_bar | data_contrast | 数据/财经/横评 |
+| **教程清单** | #5c4a3a 大地色 | #fff | sans | number_prefix | logo_collage | how-to/工具榜 |
+| **专题盘点** | #c62828 中国红 | #fdf8ed | Songti SC | dash_decoration | timeline | 年终/盘点/历史 |
+
+每个组合都对应不同的「视觉性格」。一个号至少要在 3 个组合之间轮换，才不会让读者审美疲劳。
+
+### article.json 字段升级
+
+`meta.layout_variant` 增加 5 字段：
+
+```json
+{
+  "id": "quote_montage",
+  "secondary": ["comparison_table"],
+  "h2_decoration": "classic_chinese_serial",
+  "accent_color": "#8b3a3a",
+  "page_bg": "#fdf8ed",
+  "font_family": "Songti SC",
+  "cover_template": "slogan_large",
+  "components_used": [...]
+}
+```
+
+### 同步到 ~/.wechat-history.json
+
+每次 publish 成功，把 5 维度签名追加到 history：
+
+```json
+{"slug": "ai-pm-real-vs-fake", "variant_id": "comparison_table", "accent_color": "#7a5500", "h2_decoration": "chapter_number", "cover_template": "data_contrast", ...}
+```
+
+下次创作时，从 history 读最近 3 篇，做 5 维度对比，强制至少改 3 个。
+
+---
+
 ## 混合骨架支持（v2.1 新增）
 
 实战发现深度公号文经常用 **主骨架 + 辅骨架** 组合，单骨架不够。layout-variants.md §4 决策树支持组合：
