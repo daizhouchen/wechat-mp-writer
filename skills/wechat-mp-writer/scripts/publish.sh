@@ -71,13 +71,26 @@ b = d.encode('utf-8')
 if len(b) <= 120:
     print(d, end='')
 else:
-    # 二分截到 120 字节内
     s = d
     while len(s.encode('utf-8')) > 120:
         s = s[:-1]
     print(s, end='')
 " "$DIGEST")
   DIGEST="$TRIMMED"
+fi
+
+# title 64 字节硬限制（微信 add_draft 限制；errcode 45003）
+# 中文 3 字节、英文/数字/标点 1 字节；超限直接拒绝避免 API 浪费
+if [ -n "$TITLE" ]; then
+  TITLE_BYTES=$(python3 -c "import sys; print(len(sys.argv[1].encode('utf-8')))" "$TITLE")
+  if [ "$TITLE_BYTES" -gt 64 ]; then
+    echo "" >&2
+    echo "✗ TITLE 超 64 字节限制（实际 $TITLE_BYTES 字节）" >&2
+    echo "  当前: $TITLE" >&2
+    echo "  提示: 中文 3 字节/字、英文+标点 1 字节/字 · 微信 add_draft 硬约束" >&2
+    echo "  改 article.meta 里的 TITLE=\"...\" 后重跑" >&2
+    exit 2
+  fi
 fi
 
 # ----------------------------------------------------------------------------
@@ -119,7 +132,8 @@ done
 echo "  ${#INLINE_URLS[@]} 张图已上传" >&2
 
 # ----------------------------------------------------------------------------
-# Step 4: 替换 base64 → mmbiz URL，写 article-wechat.html
+# Step 4: 替换本地图 src → mmbiz URL，写 article-wechat.html
+# 支持 base64 / 相对路径 (./images/...) / 绝对路径，按 img 出现顺序消费 INLINE_URLS
 # ----------------------------------------------------------------------------
 echo "[4/6] 渲染 wechat 版 HTML..." >&2
 URLS_JSON=$(printf '%s\n' "${INLINE_URLS[@]}" | python3 -c "import json,sys; print(json.dumps([l.strip() for l in sys.stdin.read().splitlines() if l.strip()]))")
@@ -130,13 +144,20 @@ from pathlib import Path
 src_path, urls_json = sys.argv[1], sys.argv[2]
 urls = json.loads(urls_json)
 t = Path(src_path).read_text(encoding="utf-8")
-def rep(m, _i=[0]):
-    u = urls[_i[0] % len(urls)]; _i[0] += 1
-    return f'src="{u}"'
-t = re.sub(r'src="data:image/[^;]+;base64,[^"]+"', rep, t)
+# 按顺序替换所有本地 img src（base64 / 相对路径 / 绝对路径），跳过已有 http/mmbiz URL
+inline_idx = [0]
+def rep(m):
+    src = m.group(1)
+    if src.startswith('http') or 'mmbiz' in src:
+        return m.group(0)
+    if inline_idx[0] < len(urls):
+        u = urls[inline_idx[0]]; inline_idx[0] += 1
+        return m.group(0).replace(src, u)
+    return m.group(0)
+t = re.sub(r'<img[^>]+?src="([^"]+)"', rep, t)
 out = Path(src_path).with_name("article-wechat.html")
 out.write_text(t, encoding="utf-8")
-print(f"  写入 {out} ({len(t)} chars)", file=sys.stderr)
+print(f"  写入 {out} ({len(t)} chars · 替换 {inline_idx[0]} 张图)", file=sys.stderr)
 PYEOF
 
 # ----------------------------------------------------------------------------

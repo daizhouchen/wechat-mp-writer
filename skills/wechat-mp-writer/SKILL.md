@@ -11,6 +11,17 @@ description: '微信公众号内容创作与发布全流程 Skill（v2，distill
 
 ---
 
+## v2.1.3 升级说明（2026-05-22 · cron 自动连载实战沉淀）
+
+100 篇 50 天自动连载流水线（system crontab + claude headless）真实跑通后踩出来的 2 个硬坑：
+
+1. **PIL fallback 加固到图片 pipeline**——playwright MCP 在 cron / 远程 agent / 长会话场景大概率不可用。新增 `scripts/render_pil_template.py` 通用模板（cover_template 全部 5 种 + 2x2 matrix）+ image-pipeline.md §12 加 P2 PIL fallback 路径。零依赖只需 WenQuanYi 字体，2 秒内出图。playwright 报错 → 立即降 P2，不重试。
+2. **publish.sh 两个致命 bug 修复**：① 替换正则只支持 base64 src，相对路径（`./images/...`）完全不替换 → 上传后微信草稿图片白板。改正则按顺序消费 INLINE_URLS，支持 base64 / 相对路径 / 绝对路径。② title 超 64 字节硬限制（errcode 45003）现在 publish.sh 启动时即检查，超限直接 exit 2，避免浪费 API 调用 + 拿不到错误反馈。
+
+适用场景：cron 自动连载 / 后台批量产稿 / 任何依赖 MCP 不可用环境的部署。
+
+---
+
 ## v2.1 升级说明（2026-05-14）
 
 v2.1 是「$500K vs 月薪 4 万：真假 AI PM 分水岭」一文 5 版迭代踩坑后的实战沉淀。在 v2 基础上加 6 块：

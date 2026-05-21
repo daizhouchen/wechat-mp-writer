@@ -511,15 +511,34 @@ verdict = fail  ⟺  total < 10   OR  any item ≤ 2
 </svg>
 ```
 
-### 通用渲染流程
+### 通用渲染流程（两条路径 · 按可用性选）
 
-SVG → PNG（公众号上传需要 PNG）：
+SVG → PNG（公众号上传需要 PNG），按以下优先级选：
+
+**P1 · Playwright MCP（首选 · 还原度最高）**
 1. 写 SVG 到 `./articles/<slug>/images/cover-render.html`（带 viewport 设置）
-2. 用 playwright 起 http server + 截图，输出 `cover.png`
-3. Read 工具看一眼新 PNG 做 vision 审查
+2. 用 playwright MCP `browser_navigate` 到 `data:text/html;base64,<...>` URL（避开 file:// 限制）+ `browser_take_screenshot` 输出 `cover.png`
+3. Read 工具看 PNG 做 vision 审查
 4. 走 publish.sh 上传
 
-具体 playwright 截图代码见 `~/.claude/skills/wechat-mp-writer/scripts/publish.sh` 注释。
+**P2 · PIL fallback（playwright 不可用时 · cron / 远程 agent / MCP 断连场景）** ★ v2.1.3 新增
+
+playwright MCP 任何原因不可用（断连 / cron 环境 / data URL 太大 / 服务器禁端口）→ 直接用 PIL 画 PNG，零依赖只需 WenQuanYi 字体。
+
+具体做法：
+1. 复制模板 `~/.claude/skills/wechat-mp-writer/scripts/render_pil_template.py` 到 `./articles/<slug>/render_images.py`
+2. 改 `OUT_DIR` / `ACCENT` (按 style_preset) / 文案内容
+3. `python3 render_images.py` → 直接输出 PNG 到 images/
+4. 走 vision 审查（Read 工具）+ publish.sh
+
+PIL 路径的限制：
+- 不支持复杂 SVG 渐变/曲线，但 90% 公众号配图都是 卡片+大字+矩阵 这种 PIL 完全 OK 的
+- 文字必须用 WenQuanYi 字体路径：`/home/zcdai/.local/share/fonts/wqy-microhei/wqy-microhei.ttc`
+- 单文件 < 100 行代码即可画出 cover_template (logo_collage / data_contrast / matrix)
+
+实战参考：`/home/zcdai/kn/ms/articles/ai-agent-4-paths/render_images.py`（cron 自动撰文场景 / PIL 直画 cover + 决策矩阵 / 2 张 PNG 渲染时间 < 2 秒）
+
+判定何时降到 P2：playwright MCP 调用一次报错 → 立即降到 P2，不重试。
 
 ---
 
