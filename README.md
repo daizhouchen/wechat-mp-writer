@@ -10,18 +10,20 @@
 
 # wechat-mp-writer
 
-微信公众号内容创作与发布 Claude Code Skill。从信息搜集、内容撰写、排版到 API 发布的端到端全自动工作流。
+微信公众号内容创作与发布 Claude Code Skill。覆盖信息搜集、内容撰写、排版和 API 发布的完整工作流。
 
-**v2（2026-05）升级**：参考 book-distiller / movie-distiller / domain-onboarding 三个蒸馏级 skill 的方法论 DNA，把"工作流清单"升级为"distiller 级蒸馏产物"。核心改动在**内容深度**和**图片获取与视觉审查**两块——每篇文章带"信任度报告"，每张图都过 Claude Vision 三项审查。
+**当前版本 v2.1.3**：从来源搜集、结构化写作、配图审查到微信兼容排版。来源分级和信任度报告保存在 `article.json`，默认不显示在成稿中；交互会话优先使用宿主的看图能力，独立 Vision API 为可选路径。
 
-## v2 新功能（核心改动）
+## 核心能力
 
 - **三层证据链**：事实层 → 机制层 → 观点层。每条观点必 cite ≥3 条事实，每段必含具体名词（人名/公司/数字/年份），禁止"裸观点"和"框架名出现在正文"。详见 `references/content-engine.md`。
-- **来源 A/B/C/D 分级**：每条信息打分级，文末自动渲染"信任度报告"——A 级一手原始 N 处 · B 级权威二手 N 处 · C 级普通二手 N 处 · 作者推断 N 处 · 置信度 ★★★★。详见 `references/source-grading.md`。
+- **来源 A/B/C/D 分级**：每条信息记录来源等级，在 `article.json` 中计算信任度报告，供核查使用。详见 `references/source-grading.md`。
 - **6 段图片 Pipeline + Vision 审查**：实体级搜词 → 多源抓取（Wikimedia / Unsplash / 官方 / 本地 / Web）→ 去重 → **Claude Vision 三项审查（对题度 / 清晰度 / 手机适配，各 0-5 分）** → 段落语义匹配 → 失败回退（SVG / 引述块 / 跳过）。详见 `references/image-pipeline.md`。
-- **7 种排版骨架 + 防审美疲劳**：数据先行 / 故事开篇 / 问答列表 / 时间线 / 对比表 / 拆解清单 / 访谈摘录。每篇按决策树选骨架 + 强调色 + 装饰，强制和近 3 篇不同。字数对标新智元（短 1500-2500 / 中 2500-4000 / 长 ≤6000，绝不出 distiller 那种 8000+ 字长文）。详见 `references/layout-variants.md`。
+- **7 种排版骨架 + 防审美疲劳**：数据先行 / 故事开篇 / 问答列表 / 时间线 / 对比表 / 拆解清单 / 访谈摘录。按主题选择骨架、强调色与装饰；当前字数档位为短 2500–3500 / 中 3500–5500 / 长 5500–8000（中文 + 英文 token × 0.5）。详见 `references/layout-variants.md`。
 - **article.json 结构化中间产物**：可改、可量化、可复用。改某段事实只动 JSON 一个字段。详见 `references/article-schema.md`。
-- **21 项量化质量闸门**：`scripts/quality_check.py` 扫 A 级事实数 / AI 套话 / 框架名泄漏 / 字数 budget / vision pass 率 / layout 防重复等。任一 fail 不允许发布。
+- **25 项量化质量闸门**：`scripts/quality_check.py` 检查来源、素材利用率、字数、图片审查、排版等，结果写回 `article.json`。未通过检查时先修订文章。
+
+以上资源路径相对于 [Skill 目录](skills/wechat-mp-writer/)，完整入口为 [SKILL.md](skills/wechat-mp-writer/SKILL.md)。
 
 ## v1 功能（保留 + 兼容）
 
@@ -52,18 +54,26 @@ claude plugin install wechat-mp-writer@wechat-mp-writer --scope user
 
 安装完成后，在任何对话中说"写一篇公众号文章"或输入 `/wechat-mp-writer:wechat-mp-writer` 即可触发。
 
-### 方式二：手动安装
+### 方式二：从本地目录加载
 
 ```bash
 # 克隆仓库
 git clone https://github.com/daizhouchen/wechat-mp-writer.git
 
-# 复制到 Claude Code 插件目录
-cp -r wechat-mp-writer ~/.claude/plugins/cache/wechat-mp-writer/wechat-mp-writer/1.0.0/
-
-# 在 Claude Code 中重新加载
-/reload-plugins
+# 启动一个加载本地插件的 Claude Code 会话
+claude --plugin-dir ./wechat-mp-writer
 ```
+
+这种方式适合本地试用和修改；持久安装使用方式一。参见 [Claude Code 插件文档](https://code.claude.com/docs/en/plugins)。
+
+### 运行依赖
+
+- Python 3.10+。`wechat_api.py`、`quality_check.py`、基础搜图使用标准库。
+- 独立 Vision API 审图：`python -m pip install anthropic`，并配置 `ANTHROPIC_API_KEY`；会产生 API 用量。
+- PIL 图片模板：`python -m pip install Pillow`，并准备中文字体；通过 `WECHAT_FONT_PATH` 指定字体文件。默认输出到当前目录的 `articles/demo-slug/images/`，可用 `WECHAT_IMAGE_OUTPUT_DIR` 覆盖。
+- `publish.sh` 需要 Bash（Windows 可使用 WSL 或 Git Bash）。仅写作、排版不需要微信 API 凭据。
+
+下文的脚本命令均从仓库根目录运行；安装为插件时，使用插件目录内对应脚本的绝对路径。
 
 ### 卸载
 
@@ -131,7 +141,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 python3 skills/wechat-mp-writer/scripts/image_vision_review.py batch \
     --plan ./articles/my-article/article.json
 
-# 跑 21 项质量闸门
+# 跑质量闸门（会更新 article.json 的检查报告；保留原稿时请先复制文件）
 python3 skills/wechat-mp-writer/scripts/quality_check.py check \
     --article ./articles/my-article/article.json \
     --html ./articles/my-article/article.html
@@ -152,7 +162,9 @@ wechat-mp-writer/
 │       │   ├── compliance_check.py   # v1 合规检查（保留向后兼容）
 │       │   ├── image_search.py       # [v2] 实体级搜词 + 多源抓取 + 去重
 │       │   ├── image_vision_review.py# [v2] Claude Vision 三项审查（对题度/清晰度/手机适配）
-│       │   └── quality_check.py      # [v2] 21 项量化质量闸门
+│       │   ├── quality_check.py      # 量化质量闸门（当前 25 项）
+│       │   ├── render_pil_template.py# Pillow 封面 / 矩阵图模板
+│       │   └── publish.sh            # Bash 草稿 / 发布工作流
 │       ├── references/
 │       │   ├── content_templates.md    # 8 种内容类型模板（v1）
 │       │   ├── wechat_html_compat.md   # 微信 HTML 兼容性 + 排版组件（v1）

@@ -3,13 +3,13 @@
 PIL 图片渲染模板 · wechat-mp-writer 的图片 fallback 路径
 
 当 playwright MCP 不可用时（断连 / cron 环境 / 远程 agent），
-用这个模板直接画 PNG，零依赖只用 PIL + WenQuanYi 中文字体。
+用这个模板直接画 PNG，需要 Pillow 和中文字体。
 
 ==== 使用方法 ====
 1. 复制这个文件到 ./articles/<slug>/render_images.py
 2. 改 OUT_DIR / 颜色 / 文案 / 布局
 3. python3 render_images.py
-4. images/cover.png / images/section.png 就生成了
+4. images/cover.png / images/matrix.png 就生成了
 
 ==== 风格预设速查（accent_color 一改，整张图换风） ====
 - tech_deep:  ORANGE = (122, 85, 0)   · CREAM = (255, 247, 232)
@@ -19,19 +19,17 @@ PIL 图片渲染模板 · wechat-mp-writer 的图片 fallback 路径
 - tutorial:   ORANGE = (92, 74, 58)   · CREAM = (255, 255, 255)
 - retrospect: ORANGE = (198, 40, 40)  · CREAM = (253, 248, 237)
 
-==== 字体路径 ====
-- /home/zcdai/.local/share/fonts/wqy-microhei/wqy-microhei.ttc  ← 主用
-- /usr/share/fonts/dejavu/*.ttf  ← 英文 fallback
-
-==== 实战参考 ====
-- /home/zcdai/kn/ms/articles/ai-agent-4-paths/render_images.py  ← 完整 logo_collage + 决策矩阵
+==== 环境变量 ====
+- WECHAT_FONT_PATH：中文字体文件（TTF / TTC / OTF），未设置时尝试系统常见字体
+- WECHAT_IMAGE_OUTPUT_DIR：输出目录，默认当前目录下 articles/demo-slug/images
 """
 from PIL import Image, ImageDraw, ImageFont
 import os
+from pathlib import Path
 
 # ---- 配置（每篇要改） ----
 SLUG = 'demo-slug'
-OUT_DIR = f'/home/zcdai/kn/ms/articles/{SLUG}/images'
+OUT_DIR = os.environ.get('WECHAT_IMAGE_OUTPUT_DIR', str(Path.cwd() / 'articles' / SLUG / 'images'))
 ACCENT = (122, 85, 0)        # 主色
 CREAM = (255, 247, 232)      # 浅色卡片底
 CREAM_DEEP = (254, 240, 208) # 加深的卡片底
@@ -40,12 +38,21 @@ INK = (26, 26, 26)
 GRAY = (102, 102, 102)
 LGRAY = (153, 153, 153)
 LINE = (217, 217, 217)
-FONT_PATH = '/home/zcdai/.local/share/fonts/wqy-microhei/wqy-microhei.ttc'
+FONT_PATH = os.environ.get('WECHAT_FONT_PATH', '')
 
 
 def F(size):
-    """字体助手。WQY MicroHei TTC 单一 index=0 即可，中英文混排都 OK。"""
-    return ImageFont.truetype(FONT_PATH, size, index=0)
+    """Use a configured CJK font or a common system font."""
+    candidates = [Path(FONT_PATH).expanduser()] if FONT_PATH else [
+        Path(os.environ.get('WINDIR', 'C:/Windows')) / 'Fonts' / 'msyh.ttc',
+        Path('/System/Library/Fonts/PingFang.ttc'),
+        Path('/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'),
+        Path('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'),
+    ]
+    for font_path in candidates:
+        if font_path.is_file():
+            return ImageFont.truetype(str(font_path), size, index=0)
+    raise FileNotFoundError('未找到中文字体；请设置 WECHAT_FONT_PATH 为可用的 TTF / TTC / OTF 文件路径。')
 
 
 def measure(draw, text, font):

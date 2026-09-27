@@ -1,6 +1,6 @@
 ---
 name: wechat-mp-writer
-description: '微信公众号内容创作与发布全流程 Skill（v2，distiller 级蒸馏产物）。覆盖从选题、信息搜集、撰写、排版、图片 vision 审查、量化质量闸门到通过微信公众平台API发布的完整工作流。v2 新增：三层证据链 + A/B/C/D 来源分级 + 文末信任度报告 + 6 段图片 pipeline + Vision 三项审查（对题度/清晰度/手机适配）+ 7 种排版骨架防审美疲劳 + article.json 结构化中间产物 + 21 项量化质量闸门。当用户提到以下场景时务必触发此 skill：写公众号文章、微信推文、公众号排版、公众号发布、草稿箱、封面图上传、微信图文消息、公众号SEO、公众号预览、mp.weixin.qq.com 相关操作、135编辑器/秀米导入、article digest、公众号CTA、微信素材管理、access_token 配置、配图/图片审查/选图/换图/对标新智元/字数控制。即使用户没有明确说公众号，只要涉及微信内容创作或发布，也应触发。'
+description: '创作、编辑和排版微信公众号文章，包含来源核查、结构化稿件、配图审查及微信公众平台草稿、预览和发布操作。用于公众号文章、微信推文、公众号排版或素材管理请求；普通文章配图、微信小程序和企业微信操作不使用此 skill。'
 ---
 
 # 微信公众号内容创作与发布 Skill
@@ -15,7 +15,7 @@ description: '微信公众号内容创作与发布全流程 Skill（v2，distill
 
 100 篇 50 天自动连载流水线（system crontab + claude headless）真实跑通后踩出来的 2 个硬坑：
 
-1. **PIL fallback 加固到图片 pipeline**——playwright MCP 在 cron / 远程 agent / 长会话场景大概率不可用。新增 `scripts/render_pil_template.py` 通用模板（cover_template 全部 5 种 + 2x2 matrix）+ image-pipeline.md §12 加 P2 PIL fallback 路径。零依赖只需 WenQuanYi 字体，2 秒内出图。playwright 报错 → 立即降 P2，不重试。
+1. **PIL fallback 加固到图片 pipeline**——playwright MCP 不可用时，可使用 `scripts/render_pil_template.py` 中的 logo_collage 封面和 2x2 matrix 模板；其他封面类型提供布局提示，需按文章改写。依赖 Pillow 和中文字体，使用 `WECHAT_FONT_PATH` 指定字体、`WECHAT_IMAGE_OUTPUT_DIR` 指定输出目录。详见 `references/image-pipeline.md` §12。
 2. **publish.sh 两个致命 bug 修复**：① 替换正则只支持 base64 src，相对路径（`./images/...`）完全不替换 → 上传后微信草稿图片白板。改正则按顺序消费 INLINE_URLS，支持 base64 / 相对路径 / 绝对路径。② title 超 64 字节硬限制（errcode 45003）现在 publish.sh 启动时即检查，超限直接 exit 2，避免浪费 API 调用 + 拿不到错误反馈。
 
 适用场景：cron 自动连载 / 后台批量产稿 / 任何依赖 MCP 不可用环境的部署。
